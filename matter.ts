@@ -1,10 +1,10 @@
-import { pbkdf2Sync } from 'crypto';
+import { pbkdf2Sync, randomBytes } from 'crypto';
 import * as elliptic from 'elliptic';
 import BN from 'bn.js';
 
 const ec = new elliptic.ec('p256');
 
-function generateVerifier(passcode: number, salt: Buffer, iterations: number): string {
+function generateVerifier(passcode: number, salt: Buffer, iterations: number = 1000): string {
     const WS_LENGTH: number = 32 + 8; // Equivalent to NIST256p.baselen + 8
     const passcodeBuffer: Buffer = Buffer.alloc(4);
     passcodeBuffer.writeUInt32LE(passcode, 0);
@@ -40,6 +40,42 @@ function generateManualPairingCode(discriminator: number, pincode: number, vid: 
 
     const payload = `${chunk1}${chunk2}${chunk3}${chunk4}${chunk5}`;
     return `${payload}${Verhoeff.calcCheckDigit(payload)}`;
+}
+
+function generatePasscode(): number {
+    const MIN_PASSCODE = 1;
+    const MAX_PASSCODE = 99999998;
+    const INVALID_PASSCODES = [
+        0, 11111111, 22222222, 33333333, 44444444, 55555555, 66666666, 77777777, 88888888, 99999999,
+        12345678, 87654321
+    ];
+    const MAX_ATTEMPTS = 100; // Maximum number of attempts before giving up
+    const DEFAULT_PASSCODE = 20202021; // A known valid passcode to return as fallback
+
+    let passcode: number;
+    let attempts = 0;
+    do {
+        passcode = Math.floor(Math.random() * (MAX_PASSCODE - MIN_PASSCODE + 1)) + MIN_PASSCODE;
+        attempts++;
+
+        if (attempts >= MAX_ATTEMPTS) {
+            return DEFAULT_PASSCODE;
+        }
+    } while (INVALID_PASSCODES.includes(passcode));
+
+    return passcode;
+}
+
+function generateDiscriminator(): number {
+    const MIN_DISCRIMINATOR = 0;
+    const MAX_DISCRIMINATOR = 4095; // 2^12 - 1, as it's a 12-bit value
+
+    return Math.floor(Math.random() * (MAX_DISCRIMINATOR - MIN_DISCRIMINATOR + 1)) + MIN_DISCRIMINATOR;
+}
+
+function generateSalt(): string {
+    const saltLength = Math.floor(Math.random() * (16 - 8 + 1)) + 8; // Random length between 8 and 16
+    return randomBytes(saltLength).toString("base64");
 }
 
 class Verhoeff {
@@ -82,4 +118,7 @@ class Verhoeff {
 export {
     generateVerifier,
     generateManualPairingCode,
+    generatePasscode,
+    generateDiscriminator,
+    generateSalt
 }
